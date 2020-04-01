@@ -7,7 +7,19 @@ from sql_queries import *
 
 
 def process_song_file(cur, filepath):
-    # open song file
+    
+    '''
+    Function desc: Process song_data: Tables loaded -> songs and artists
+    
+    Parameters:
+        
+    cur -> cursor variable to postgres
+    
+    filepath -> path of the songs files
+    
+    '''
+    
+    
     df = pd.read_json(filepath,lines=True)
 
     # insert song record
@@ -20,13 +32,21 @@ def process_song_file(cur, filepath):
 
 
 def process_log_file(cur, filepath):
-    # open log file
+    
+    
+    '''
+    Function desc: Process log_data: Tables loaded -> users and time
+    
+    parameters:
+    
+    cur -> cursor variable to postgres
+    
+    filepath -> path of the log files
+    
+    '''
+    
     df = pd.read_json(filepath,lines=True)
-
-    # filter by NextSong action
     df = df[df["page"]=="NextSong"]
-
-    # convert timestamp column to datetime
     t =  pd.to_datetime(df["ts"],unit='ms')
     
     # insert time data records
@@ -44,7 +64,7 @@ def process_log_file(cur, filepath):
     for i, row in user_df.iterrows():
         cur.execute(user_table_insert, row)
 
-    # insert songplay records
+    # process songplay records
     for index, row in df.iterrows():
         
         # get songid and artistid from song and artist tables
@@ -86,18 +106,43 @@ def process_data(cur, conn, filepath, func):
 
 def main():
     
+    
+     #Initialize connection to local postgres server and set cursor.
+    conn = psycopg2.connect("host=127.0.0.1 dbname=sparkifydb user=student password=student")
+    
+    conn.set_session(autocommit=True)
+
+    cur = conn.cursor()
+    
+    
+    '''
+    Check and removes the songplay.csv file.
+    
+    Songplay.csv is created by the process_log_file function and 
+    
+    finally copied (COPY) into songplay table instead of running
+    
+    individual insert statements
+    
+    '''
+    
     if os.path.exists("/home/workspace/songplay.csv"):
             os.remove("/home/workspace/songplay.csv")
             print("songplay csv removed!")
     else:
-          print("The file does not exist")
-    conn = psycopg2.connect("host=127.0.0.1 dbname=sparkifydb user=student password=student")
-    conn.set_session(autocommit=True)
-
-    cur = conn.cursor()
-
+            print("The file does not exist")
+            
+    
+   
+    #Process song_data: Tables -> songs and artists
+    
     process_data(cur, conn, filepath='data/song_data', func=process_song_file)
+    
+    #Process song_data: Tables -> users and time table / File -> songplay.csv
+    
     process_data(cur, conn, filepath='data/log_data', func=process_log_file)
+    
+    #Load Songplay table from processed csv file directly
     cur.execute(""" COPY songplays (start_time,user_id,level,song_id,artist_id,session_id,location,user_agent) FROM '/home/workspace/songplay.csv' WITH CSV """)
     
     conn.close()
